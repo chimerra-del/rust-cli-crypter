@@ -119,7 +119,7 @@ fn xorshift_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn
 }
 
 fn madryga_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    / Читаем файл
+    // Читаем файл
     let mut data = fs::read(file_path)?;
     // Шифруем
     madryga_encrypt(&mut data);
@@ -127,4 +127,17 @@ fn madryga_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn 
     fs::write(&output_path, &data)?;
     println!("Файл зашифрован и сохранён в: {}", output_path);
     Ok(())
+}
+
+fn viginere_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    // Читаем файл
+    let mut data = fs::open(file_path)?;
+    // Нужно передать файл в виде нужного формата, ведь это алфаитный шифр
+    let mut buffer = Vec::new();
+    data.read_to_end(&mut buffer)?;
+    // Обработка данных
+    let processed_data = vigenere_encrypt(&buffer, key, decrypt);
+    // Запись результата в новый файл
+    let mut output_file = File::create(output_path)?;
+    output_file.write_all(&processed_data)?;
 }
