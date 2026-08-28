@@ -75,12 +75,37 @@ fn main() {
                 eprintln!("Ошибка шифрования: {}", e);
             }
         }
+         "xtea" => {
+           if let Err(e) = xtea_encrypt_file(&file_path, password.as_bytes()) {
+             eprintln!("Ошибка шифрования: {}", e);
+           }
+         }
+        "xorshift" => {
+          if let Err(e) = xorshift_encrypt_file(&file_path, password.as_bytes()) {
+            eprintln!("Ошибка шифрования: {}", e);
+          }
+        }
+        "madryga" => {
+          if let Err(e) = madryga_encrypt_file(&file_path, password.as_bytes()) {
+            eprintln!("Ошибка шифрования: {}", e);
+          }
+        }
+        "viginere" => {
+          if let Err(e) = viginere_encrypt_file(&file_path, password.as_bytes()) {
+            eprintln!("Ошибка шифрования: {}", e);
+          }
+        }
+        "salsa20" => {
+          if let Err(e) = salsa20_encrypt_file(&file_path, password.as_bytes()) {
+            eprintln!("Ошибка шифрования: {}", e);
+          }
+        }
         _ => {
             eprintln!("Неизвестный алгоритм: {}", alg);
         }
     }
 }
-
+//! Список функций вызовов для шифрования
 // Функция для шифрования файла
 fn rc4_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
@@ -129,6 +154,7 @@ fn madryga_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn 
     Ok(())
 }
 
+//? Возможны ошибки в реализации
 fn viginere_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::open(file_path)?;
@@ -140,4 +166,15 @@ fn viginere_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn
     // Запись результата в новый файл
     let mut output_file = File::create(output_path)?;
     output_file.write_all(&processed_data)?;
+}
+
+fn salsa20_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    // Читаем файл
+    let mut data = fs::read(file_path)?;
+    // Инициализируем
+    let mut cipher = Salsa20::new(&key, &nonce);
+    cipher.process(&mut data);
+    let output_path = format!("{}.enc", file_path);
+    std::fs::write(&output_path, &data)?;
+    Ok(())
 }

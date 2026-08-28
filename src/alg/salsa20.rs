@@ -14,7 +14,7 @@ impl Salsa20 {
         state[3]  = u32::from_le_bytes(key[8..12].try_into().unwrap());
         state[4]  = u32::from_le_bytes(key[12..16].try_into().unwrap());
         state[11] = u32::from_le_bytes(key[16..20].try_into().unwrap());
-        state[12] = u32::from_le_bytes(key[21..24].try_into().unwrap());
+        state[12] = u32::from_le_bytes(key[20..24].try_into().unwrap()); 
         state[13] = u32::from_le_bytes(key[24..28].try_into().unwrap());
         state[14] = u32::from_le_bytes(key[28..32].try_into().unwrap());
         state[6]  = 0;
@@ -37,12 +37,10 @@ impl Salsa20 {
         let mut x = self.state;
 
         for _ in 0..10 {
-            // Раунды по столбцам
             Self::quarter_round(&mut x, 0, 4, 8, 12);
             Self::quarter_round(&mut x, 5, 9, 13, 1);
             Self::quarter_round(&mut x, 10, 14, 2, 6);
             Self::quarter_round(&mut x, 15, 3, 7, 11);
-            // Раунды по строкам
             Self::quarter_round(&mut x, 0, 1, 2, 3);
             Self::quarter_round(&mut x, 5, 6, 7, 4);
             Self::quarter_round(&mut x, 10, 11, 8, 9);
