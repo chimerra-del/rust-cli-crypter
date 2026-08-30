@@ -2,15 +2,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-mod rc4;
-mod madryga;
-mod lucifer;
-mod salsa20;
-mod chacha20;
-mod xtea;
-mod rc5;
-mod viginere;
-mod xorshift;
+mod alg;
 
 use rc4::{rc4_init, rc4_crypt};
 
@@ -100,6 +92,11 @@ fn main() {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
+        "rc5" => {
+          if let Err(e) = rc5_encrypt_file(&file_path, password.as_bytes()) {
+            eprintln!("Ошибка шифрования: {}", e);
+          }
+        }
         _ => {
             eprintln!("Неизвестный алгоритм: {}", alg);
         }
@@ -176,5 +173,30 @@ fn salsa20_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn 
     cipher.process(&mut data);
     let output_path = format!("{}.enc", file_path);
     std::fs::write(&output_path, &data)?;
+    Ok(())
+}
+
+fn rc5_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    // Читаем файл
+    let data = fs::read(file_path)?;
+    let mut s = [0u8; 28];
+    for (i, &byte) in password.iter().enumerate() {
+        s[i % 28] ^= byte;
+    }
+    
+    let rounds: u8 = 12;
+    let mut encrypted = Vec::new();
+    for chunk in data.chunks(8) {
+        let mut padded = [0u8; 8];
+        padded[..chunk.len()].copy_from_slice(chunk);
+        
+        let mut out = [0u8; 8];
+        rc5::rc5_crypt_block(&s, rounds, &padded, &mut out);
+        encrypted.extend_from_slice(&out);
+    }
+    
+    let output_path = format!("{}.enc", file_path);
+    fs::write(&output_path, &encrypted)?;
+    println!("Файл зашифрован и сохранён в: {}", output_path);
     Ok(())
 }
