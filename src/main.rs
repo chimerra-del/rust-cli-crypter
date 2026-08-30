@@ -46,7 +46,7 @@ fn main() {
         }
     };
 
-    let password = match args.get(4) {
+    let key = match args.get(4) {
         Some(arg) => arg.clone(),
         None => {
             eprintln!("Ошибка: не указан пароль");
@@ -63,37 +63,37 @@ fn main() {
     // Выбираем алгоритм
     match alg.as_str() {
         "rc4" => {
-            if let Err(e) = rc4_encrypt_file(&file_path, password.as_bytes()) {
+            if let Err(e) = rc4_encrypt_file(&file_path, key.as_bytes()) {
                 eprintln!("Ошибка шифрования: {}", e);
             }
         }
          "xtea" => {
-           if let Err(e) = xtea_encrypt_file(&file_path, password.as_bytes()) {
+           if let Err(e) = xtea_encrypt_file(&file_path, key.as_bytes()) {
              eprintln!("Ошибка шифрования: {}", e);
            }
          }
         "xorshift" => {
-          if let Err(e) = xorshift_encrypt_file(&file_path, password.as_bytes()) {
+          if let Err(e) = xorshift_encrypt_file(&file_path, key.as_bytes()) {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
         "madryga" => {
-          if let Err(e) = madryga_encrypt_file(&file_path, password.as_bytes()) {
+          if let Err(e) = madryga_encrypt_file(&file_path, key.as_bytes()) {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
         "viginere" => {
-          if let Err(e) = viginere_encrypt_file(&file_path, password.as_bytes()) {
+          if let Err(e) = viginere_encrypt_file(&file_path, key.as_bytes()) {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
         "salsa20" => {
-          if let Err(e) = salsa20_encrypt_file(&file_path, password.as_bytes()) {
+          if let Err(e) = salsa20_encrypt_file(&file_path, key.as_bytes()) {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
         "rc5" => {
-          if let Err(e) = rc5_encrypt_file(&file_path, password.as_bytes()) {
+          if let Err(e) = rc5_encrypt_file(&file_path, key.as_bytes()) {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
@@ -104,11 +104,11 @@ fn main() {
 }
 //! Список функций вызовов для шифрования
 // Функция для шифрования файла
-fn rc4_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn rc4_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::read(file_path)?;    
     // Инициализируем RC4
-    let mut state = rc4_init(password);
+    let mut state = rc4_init(key);
     // Шифруем
     rc4_crypt(&mut state, &mut data);
     // Сохраняем в новый файл
@@ -118,7 +118,7 @@ fn rc4_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-fn xtea_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn xtea_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::read(file_path)?;
     // Шифруем
@@ -129,7 +129,7 @@ fn xtea_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std
     Ok(())
 }
 
-fn xorshift_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn xorshift_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::read(file_path)?;
     // Шифруем
@@ -140,7 +140,7 @@ fn xorshift_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn madryga_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn madryga_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::read(file_path)?;
     // Шифруем
@@ -152,7 +152,7 @@ fn madryga_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn 
 }
 
 //? Возможны ошибки в реализации
-fn viginere_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn viginere_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::open(file_path)?;
     // Нужно передать файл в виде нужного формата, ведь это алфаитный шифр
@@ -165,7 +165,7 @@ fn viginere_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn
     output_file.write_all(&processed_data)?;
 }
 
-fn salsa20_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn salsa20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let mut data = fs::read(file_path)?;
     // Инициализируем
@@ -176,11 +176,11 @@ fn salsa20_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn 
     Ok(())
 }
 
-fn rc5_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn rc5_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем файл
     let data = fs::read(file_path)?;
     let mut s = [0u8; 28];
-    for (i, &byte) in password.iter().enumerate() {
+    for (i, &byte) in key.iter().enumerate() {
         s[i % 28] ^= byte;
     }
     
@@ -200,3 +200,24 @@ fn rc5_encrypt_file(file_path: &str, password: &[u8]) -> Result<(), Box<dyn std:
     println!("Файл зашифрован и сохранён в: {}", output_path);
     Ok(())
 }
+
+fn aes_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    // Читаем файл
+    let plaintext = fs::read(file_path)?;
+    // Шифруем
+    let ciphertext = aes::cipher(plaintext, key);
+    let output_path = format!("{}.enc", file_path);
+    fs::write(&output_path, &encrypted)?;
+    println!("Файл зашифрован и сохранён в: {}", output_path);
+    Ok(())
+}
+
+/*
+// ПРИМЕР СОЗДАНИЯ ПАР АЛГОРИТМ + РЕЖИМ
+// Создаём AES с трейтом BlockCipher
+    let cipher: Box<dyn BlockCipher> = Box::new(AES::new(key));
+    
+    // Используем с ECB
+    let ciphertext = ecb::encrypt_ecb(cipher.as_ref(), plaintext);
+    println!("Encrypted: {:?}", ciphertext);
+*/

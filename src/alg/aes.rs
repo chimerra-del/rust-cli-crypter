@@ -1,5 +1,7 @@
 // Custom AES вручную
 // Теперь я собственнлсть глобальных мафиозных синдикатов
+use super::block_cipher::BlockCipher;
+
 const SBOX: [u8; 256] = [
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -20,6 +22,38 @@ const SBOX: [u8; 256] = [
 ]; // Взял из таблицы NIST
 const NUM_ROUNDS: u8 = 10;
 type State = [[u8; 4]; 4];
+
+// Повтори такое же для других шифров, срочно
+pub struct AES {
+    key: [u8; 16],
+}
+
+impl AES {
+    pub fn new(key: [u8; 16]) -> Self {
+        AES { key }
+    }
+}
+
+impl BlockCipher for AES {
+    fn block_size(&self) -> usize {
+        16
+    }
+    
+    fn encrypt_block(&self, plaintext: &[u8]) -> Vec<u8> {
+        let mut block = [0u8; 16];
+        block.copy_from_slice(plaintext);
+        cipher(&block, &self.key).to_vec()
+    }
+    
+    fn decrypt_block(&self, ciphertext: &[u8]) -> Vec<u8> {
+        // TODO: Реализовать расшифровку
+        todo!("Implement AES decryption")
+    }
+    
+    fn name(&self) -> &str {
+        "AES-128"
+    }
+}
 
 // Эта функция преобрезует текст в матрицу 4х4
 /// Вайбкод
@@ -44,7 +78,7 @@ fn store_state(state: &State, output: &mut [u8; 16]) {
 
 // Расширить ключ до 256 бит
 // Инцииализировать State в функции load_state()
-fn cipher(plaintext: &[u8; 16], key: &[u8; 16]) -> [u8; 16] {
+pub fn cipher(plaintext: &[u8; 16], key: &[u8; 16]) -> [u8; 16] {
   // загружаем состоянние
   let mut state = load_state(plaintext);
   // расширяем ключ

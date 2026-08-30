@@ -1,21 +1,4 @@
-mod aes; 
-mod chacha20; 
-mod lucifer; 
-mod madryga; 
-mod rc4; 
-mod rc5; 
-mod salsa20; 
-mod viginere; 
-mod xorshift; 
-mod xtea; 
-
-pub use aes::Aes; 
-pub use chacha20::ChaCha20; 
-pub use lucifer::Lucifer; 
-pub use madryga::Madryga; 
-pub use rc4::Rc4; 
-pub use rc5::Rc5; 
-pub use salsa20::Salsa20; 
-pub use viginere::Viginere; 
-pub use xorshift::Xorshift;
-pub use xtea::Xtea;
+pub mod aes; pub mod block_cipher; pub mod camelia; pub mod chacha20; pub mod 
+lucifer; pub mod madryga; pub mod rc4; pub mod rc5; pub mod salsa20; pub mod 
+viginere; pub mod xorshift; pub mod xtea;
+pub use block_cipher::BlockCipher;
