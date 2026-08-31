@@ -2,6 +2,7 @@
 // Теперь я собственнлсть глобальных мафиозных синдикатов
 use super::block_cipher::BlockCipher;
 
+const RCON: [u8; 10] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
 const SBOX: [u8; 256] = [
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -176,17 +177,17 @@ fn key_expansion(key: &[u8; 16]) -> Vec<u8> {
     while w.len() < 44 * 4 {
         let mut temp = [w[w.len() - 4], w[w.len() - 3], w[w.len() - 2], w[w.len() - 1]];     
         if (w.len() / 4) % 4 == 0 {
+            // Тут нужно применить rcon к первому байту
             temp = sub_word(rot_word(temp));
+            temp[0] ^= RCON[(w.len() / 4 / 4) - 1]; 
         }        
-        w.push(temp[0]);
-        w.push(temp[1]);
-        w.push(temp[2]);
-        w.push(temp[3]);
+        
+        for i in 0..4 {
+            w.push(temp[i] ^ w[w.len() - 16 + i]);
+        }
     }
-    
     w
 }
-
 // Извороты 1 с SBOX
 fn sub_word(word: [u8; 4]) -> [u8; 4] {
     [
