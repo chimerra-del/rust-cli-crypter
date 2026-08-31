@@ -3,13 +3,15 @@ use std::fs;
 use std::path::Path;
 
 mod alg;
+mod rsp_parser;
 
+use rsp_parser::run_tests;
 use rc4::{rc4_init, rc4_crypt};
 
 // Полный список возможных(Будущих) аргументов
 /* 
 –- alg
--- aead
+-- mode
 -- file_path
 -- passwd_hash
 -- key
@@ -97,6 +99,11 @@ fn main() {
             eprintln!("Ошибка шифрования: {}", e);
           }
         }
+       "aes-test" => {
+         if let Err(e) = aes_test_rsp(&file_path) {
+           eprintln!("Ошибка запуска теста AES-128: {}", e);
+         }
+       }
         _ => {
             eprintln!("Неизвестный алгоритм: {}", alg);
         }
@@ -221,3 +228,13 @@ fn aes_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::erro
     let ciphertext = ecb::encrypt_ecb(cipher.as_ref(), plaintext);
     println!("Encrypted: {:?}", ciphertext);
 */
+
+/// ТУТ НАЧИНАЮТСЯ ТЕСТЫ(Tests) ДЛЯ ВСЕХ АЛГОРИТМОВ ЧЕРЕЗ RSP ФАЙЛЫ
+fn aes_test_rsp(&file_path) -> Result<(), Box<dyn std::error::Error>> {
+   // Читаем путь к тестовому файлу
+   let testing = fs::read(file_path)?;
+   println!("Убедитесь, что тесты загружены в папку рядом с main.rs, у нас пока что проблемы, скачайте сами, извините.")
+   // Запускаем тест
+   rsp_parser::run_tests(testing)?;
+   println!("Тесты запущены, передаём управление парсеру");
+}
