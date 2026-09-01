@@ -1,7 +1,7 @@
 const C1: u32 = 0xcc9e2d51;
 const C2: u32 = 0x1b873593;
 
-fn murmur(seed: u32, data: &[u8]) -> u32 {
+pub fn murmur(seed: u32, data: &[u8]) -> u32 {
     let mut h1 = seed;
     let data_len = data.len();
     for chunk in data.chunks_exact(4) {
