@@ -37,7 +37,7 @@ pub struct CamelliaKey {
     ke: [u64; 4],    // FL/FLINV ключи (ke1, ke2, ke3, ke4)
 }
 
-fn f(f_in: u64, ke: u64) -> u64 {
+pub fn f(f_in: u64, ke: u64) -> u64 {
     let x = f_in ^ ke;
     let t1 = SBOX[((x >> 56) & MASK8 as u64) as usize] as u64;
     let t2 = SBOX[((x >> 48) & MASK8 as u64) as usize] as u64;
@@ -60,7 +60,7 @@ fn f(f_in: u64, ke: u64) -> u64 {
     (y1 << 56) | (y2 << 48) | (y3 << 40) | (y4 << 32) | (y5 << 24) | (y6 << 16) | (y7 << 8) | y8
 }
 
-fn fl(fl_in: u64, ke: u64) -> u64 {
+pub fn fl(fl_in: u64, ke: u64) -> u64 {
     let x1 = (fl_in >> 32) as u32;
     let x2 = (fl_in & MASK32 as u64) as u32;
     let k1 = (ke >> 32) as u32;
@@ -85,7 +85,7 @@ fn flinv(flinv_in: u64, ke: u64) -> u64 {
 }
 
 // ВАЙБКОД
-fn key_schedule(key: &[u8; 32]) -> CamelliaKey {
+pub fn key_schedule(key: &[u8; 32]) -> CamelliaKey {
     let kl = u64::from_be_bytes([
         key[0], key[1], key[2], key[3],
         key[4], key[5], key[6], key[7],

@@ -264,6 +264,63 @@ fn salsa20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::
     Ok(())
 }
 
+/// Функция для шифрования файла Camellia
+fn camellia_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let data = fs::read(file_path)?;
+    if data.len() < 16 {
+        return Err("Данные должны быть минимум 16 байт для Camellia".into());
+    }
+    if key.len() < 32 {
+        return Err("Ключ должен быть минимум 32 байт для Camellia-256".into());
+    }
+    
+    let key_array: [u8; 32] = key[0..32].try_into()
+        .map_err(|_| "Неверная длина ключа для Camellia")?;
+    let camellia_key = alg::key_schedule(&key_array);
+    let mut output = Vec::new();
+    for chunk in data.chunks_exact(16) {
+        let block: [u8; 16] = chunk.try_into()?;
+        let encrypted = alg::camelia_encrypt(&block, &camellia_key);
+        output.extend_from_slice(&encrypted);
+    }
+    let remainder = data.len() % 16;
+    if remainder > 0 {
+        let start = data.len() - remainder;
+        let mut last_block = [0u8; 16];
+        last_block[0..remainder].copy_from_slice(&data[start..]);
+        let encrypted = alg::camelia_encrypt(&last_block, &camellia_key);
+        output.extend_from_slice(&encrypted);
+    }
+    
+    let output_path = format!("{}.enc", file_path);
+    fs::write(&output_path, &output)?;
+    println!("✓ Файл зашифрован и сохранён в: {}", output_path);
+    Ok(())
+}
+
+/// Функция для шифрования файла ChaCha20
+fn chacha20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let data = fs::read(file_path)?;    
+    if key.len() < 32 {
+        return Err("Ключ должен быть минимум 32 байт для ChaCha20".into());
+    }    
+    let key_array: [u8; 32] = key[0..32].try_into()
+        .map_err(|_| "Неверная длина ключа для ChaCha20")?;
+    
+    let mut nonce = [0u8; 12];
+    getrandom::getrandom(&mut nonce);
+    
+    let encrypted = alg::chacha20_encrypt(&key_array, 0, &nonce, &data);
+    let output_path = format!("{}.enc", file_path);
+    let mut output = Vec::with_capacity(12 + encrypted.len());
+    output.extend_from_slice(&nonce);
+    output.extend_from_slice(&encrypted);
+    
+    fs::write(&output_path, &output)?;
+    println!("✓ Файл зашифрован и сохранён в: {}", output_path);
+    Ok(())
+}
+
 /// Функция для шифрования файла RC5
 fn rc5_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let data = fs::read(file_path)?;
@@ -414,6 +471,16 @@ fn handle_encryption(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Er
             let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
             let key = config.key.as_ref().ok_or("Ключ не указан")?;
             rc5_encrypt_file(file_path, key)?;
+        }
+        "camelia" => {
+            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
+            let key = config.key.as_ref().ok_or("Ключ не указан")?;
+            camellia_encrypt_file(file_path, key)?;
+        }
+        "chacha20" => {
+            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
+            let key = config.key.as_ref().ok_or("Ключ не указан")?;
+            chacha20_encrypt_file(file_path, key)?;
         }
         "aes" => {
             let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;

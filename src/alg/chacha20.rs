@@ -11,7 +11,7 @@ const SIGMA: [u32; 4] = [
 ];
 
 // Четвертт раунда(кручение)
-fn quarter_round(state: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize) {
+pub fn quarter_round(state: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize) {
     state[a] = state[a].wrapping_add(state[b]);
     state[d] ^= state[a];
     state[d] = state[d].rotate_right(16);  
@@ -32,7 +32,7 @@ fn quarter_round(state: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize) 
     */
 }
 
-fn inner_block(state: &mut [u32; 16]) {
+pub fn inner_block(state: &mut [u32; 16]) {
     // На столбцах
     quarter_round(state, 0, 4, 8, 12);
     quarter_round(state, 1, 5, 9, 13);
@@ -46,7 +46,7 @@ fn inner_block(state: &mut [u32; 16]) {
     quarter_round(state, 3, 4, 9, 14);
 }
 
-fn serialize(state: [u32; 16]) -> Vec<u8> {
+pub fn serialize(state: [u32; 16]) -> Vec<u8> {
     let mut result = Vec::with_capacity(64);
     for word in state {
         result.extend_from_slice(&word.to_le_bytes());
@@ -65,7 +65,7 @@ fn serialize(state: [u32; 16]) -> Vec<u8> {
          конец
 */
 
-fn chacha20_block(key: &[u8; 32], counter: u64, nonce: &[u8; 12]) -> Vec<u8> {
+pub fn chacha20_block(key: &[u8; 32], counter: u64, nonce: &[u8; 12]) -> Vec<u8> {
     let mut state: [u32; 16] = [0; 16];
     state[0..4].copy_from_slice(&SIGMA);
     
@@ -104,27 +104,27 @@ fn chacha20_block(key: &[u8; 32], counter: u64, nonce: &[u8; 12]) -> Vec<u8> {
 }
 
 /*
-chacha20_encrypt(key, counter, nonce, plaintext):
-        для j = 0 до floor(len(plaintext)/64)-1
+chacha20_encrypt(key, counter, nonce, data):
+        для j = 0 до floor(len(data)/64)-1
            key_stream = chacha20_block(key, counter+j, nonce)
            блок = простой текст[(j*64)..(j*64+63)]
            encrypted_message += block ^ key_stream
            конец
-        если ((len(plaintext) % 64) != 0)
-           j = floor(len(plaintext)/64)
+        если ((len(data) % 64) != 0)
+           j = floor(len(data)/64)
            key_stream = chacha20_block(key, counter+j, nonce)
            блок = простой текст[(j*64)..len(простой текст)-1]
-           encrypted_message += (block^key_stream)[0..len(plaintext)%64]
+           encrypted_message += (block^key_stream)[0..len(data)%64]
            конец
         return encrypted_message
         конец
 */
 
-fn chacha20_encrypt(key: &[u8; 32], counter: u64, nonce: &[u8; 12], plaintext: &[u8]) -> Vec<u8> {
+pub fn chacha20_encrypt(key: &[u8; 32], counter: u64, nonce: &[u8; 12], data: &[u8]) -> Vec<u8> {
     let mut encrypted_message: Vec<u8> = Vec::new();
-    for j in 0..(plaintext.len() / 64) {
+    for j in 0..(data.len() / 64) {
         let key_stream = chacha20_block(key, counter + j as u64, nonce);
-        let block = &plaintext[(j * 64)..((j + 1) * 64)];
+        let block = &data[(j * 64)..((j + 1) * 64)];
         
         // XOR
         for (x, y) in block.iter().zip(key_stream.iter()) {
@@ -132,10 +132,10 @@ fn chacha20_encrypt(key: &[u8; 32], counter: u64, nonce: &[u8; 12], plaintext: &
         }
     }
     
-    if plaintext.len() % 64 != 0 {
-        let j = plaintext.len() / 64;
+    if data.len() % 64 != 0 {
+        let j = data.len() / 64;
         let key_stream = chacha20_block(key, counter + j as u64, nonce);
-        let block = &plaintext[(j * 64)..];
+        let block = &data[(j * 64)..];
         
         for (x, y) in block.iter().zip(key_stream.iter()) {
             encrypted_message.push(x ^ y);

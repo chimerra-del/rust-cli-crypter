@@ -19,5 +19,8 @@ pub use salsa20::Salsa20;
 pub use salsa20::salsa20_encrypt;
 pub use rc5::rc5_encrypt;
 pub use aes::cipher;
+pub use camelia::camelia_encrypt;
+pub use camelia::key_schedule;
+pub use chacha20::chacha20_encrypt;
 
 pub use block_cipher::BlockCipher;
