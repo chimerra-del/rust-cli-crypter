@@ -77,3 +77,8 @@ impl Salsa20 {
         }
     }
 }
+
+pub fn salsa20_encrypt(data: &mut Vec<u8>, key: &[u8; 32], nonce: &[u8; 8]) {
+    let mut cipher = Salsa20::new(key, nonce);
+    cipher.process(data);
+}

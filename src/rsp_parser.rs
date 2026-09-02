@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
 
-use crate::aes::AES;
-use crate::block_cipher::BlockCipher;
+use crate::alg::aes::AES;
+use crate::alg::block_cipher::BlockCipher;
 
 pub struct RspParser {
     file_path: String,
@@ -63,7 +63,7 @@ impl RspParser {
                 let key = trimmed[..eq_pos].trim().to_uppercase();
                 let value = trimmed[eq_pos + 1..].trim().to_string();
                 
-                current_test.insert(key, value);
+                current_test.insert(key.clone(), value);
                 if key == "CIPHERTEXT" || (key == "PLAINTEXT" && current_mode == TestMode::Decrypt) {
                     if let Some(test_case) = self.build_test_case(
                         &current_test,

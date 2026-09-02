@@ -1,11 +1,11 @@
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, KeyInit};
 use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
-fn hkdf_extract(salt: &[u8], ikm: &[u8]) -> Vec<u8> {
+pub fn hkdf_extract(salt: &[u8], ikm: &[u8]) -> Vec<u8> {
     let salt = if salt.is_empty() {
-        &[0u8; 32] // 32 байта
+        &[0u8; 32] // 32 байта нулей для SHA-256
     } else {
         salt
     };
@@ -16,7 +16,7 @@ fn hkdf_extract(salt: &[u8], ikm: &[u8]) -> Vec<u8> {
     mac.finalize().into_bytes().to_vec()
 }
 
-fn hkdf_expand(prk: &[u8], info: &[u8], length: usize) -> Vec<u8> {
+pub fn hkdf_expand(prk: &[u8], info: &[u8], length: usize) -> Vec<u8> {
     let hash_len = 32; // Для SHA-256
     let max_len = hash_len * 255;
     
@@ -49,7 +49,8 @@ fn hkdf_expand(prk: &[u8], info: &[u8], length: usize) -> Vec<u8> {
     result
 }
 
-fn hkdf(salt: &[u8], ikm: &[u8], info: &[u8], length: usize) -> Vec<u8> {
+/// Полный HKDF процесс (Extract + Expand)
+pub fn hkdf(salt: &[u8], ikm: &[u8], info: &[u8], length: usize) -> Vec<u8> {
     let prk = hkdf_extract(salt, ikm);
     hkdf_expand(&prk, info, length)
 }
