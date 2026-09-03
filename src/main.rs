@@ -1,9 +1,9 @@
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::io::{self, Write};
+use clap::Parser;
 use cipher_factory::CipherFactory;
-use cipher_modes::{EcbMode, CbcMode, CtrMode, GcmMode};
+use cipher_modes::{EcbMode, CbcMode, CtrMode};
 
 mod cipher_implementations;
 mod cipher_modes;
@@ -14,116 +14,127 @@ mod passwd_hashing;
 mod hashing;
 
 /// Конфигурация для криптографических операций
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Parser)]
+#[command(name = "Crypto Tool")]
+#[command(about = "Инструмент для криптографических операций", long_about = None)]
 struct CryptoConfig {
-    file_path: Option<String>,
-    algorithm: Option<String>,
-    action: Option<String>,
-    key: Option<Vec<u8>>,
-    hash_function: Option<String>,
-    salt: Option<Vec<u8>>,
-    info: Option<Vec<u8>>,
+    /// Путь к файлу
+    #[arg(long, short = 'p')]
+    path: Option<String>,
+
+    /// Алгоритм шифрования (aes, rc4, chacha20 и т.д.)
+    #[arg(long, short = 'a')]
+    alg: Option<String>,
+
+    /// Действие (encrypt/decrypt)
+    #[arg(long, short = 'f')]
+    func: Option<String>,
+
+    /// Ключ шифрования (hex или текст)
+    #[arg(long, short = 'k')]
+    key: Option<String>,
+
+    /// Хеш-функция (murmurhash3, fnv1a, djb2)
+    #[arg(long)]
+    hash: Option<String>,
+
+    /// Salt для HKDF
+    #[arg(long, short = 's')]
+    salt: Option<String>,
+
+    /// Info для HKDF
+    #[arg(long, short = 'i')]
+    info: Option<String>,
+
+    /// Режим шифрования (ecb, cbc, ctr, gcm)
+    #[arg(long, short = 'm')]
     mode: Option<String>,
-    iv: Option<Vec<u8>>,
-    nonce: Option<Vec<u8>>,
+
+    /// Инициализационный вектор (hex)
+    #[arg(long)]
+    iv: Option<String>,
+
+    /// Nonce для потоковых шифров (hex)
+    #[arg(long)]
+    nonce: Option<String>,
 }
 
 impl CryptoConfig {
-    fn new() -> Self {
-        CryptoConfig {
-            file_path: None,
-            algorithm: None,
-            action: None,
-            key: None,
-            hash_function: None,
-            salt: None,
-            info: None,
-            mode: None,
-            iv: None,
-            nonce: None,
-        }
+    /// Преобразовать строку (hex или текст) в байты
+    fn string_to_bytes(s: &str) -> Vec<u8> {
+        // Пытаемся распарсить как hex
+        hex::decode(s).unwrap_or_else(|_| s.as_bytes().to_vec())
     }
 
-    /// Заполнить конфигурацию из аргументов командной строки
-    fn from_args(args: &[String]) -> Self {
-        let mut config = CryptoConfig::new();
+    /// Получить ключ в виде байтов
+    fn get_key(&self) -> Result<Vec<u8>, String> {
+        self.key
+            .as_ref()
+            .map(|k| Self::string_to_bytes(k))
+            .ok_or_else(|| "Ключ не указан".to_string())
+    }
 
-        if args.len() > 1 {
-            config.file_path = Some(args[1].clone());
-        }
-        if args.len() > 2 {
-            config.algorithm = Some(args[2].clone());
-        }
-        if args.len() > 3 {
-            config.action = Some(args[3].clone());
-        }
-        if args.len() > 4 {
-            config.key = Some(args[4].as_bytes().to_vec());
-        }
-        if args.len() > 5 {
-            config.hash_function = Some(args[5].clone());
-        }
-        if args.len() > 6 {
-            config.salt = Some(args[6].as_bytes().to_vec());
-        }
-        if args.len() > 7 {
-            config.info = Some(args[7].as_bytes().to_vec());
-        }
-        if args.len() > 8 {
-        config.mode = Some(args[8].clone());
-        }
-        if args.len() > 9 {
-        config.iv = Some(args[9].as_bytes().to_vec());
-        }
-        if args.len() > 10 {
-        config.nonce = Some(args[10].as_bytes().to_vec());
-        }
+    /// Получить путь к файлу
+    fn get_path(&self) -> Result<&str, String> {
+        self.path
+            .as_ref()
+            .map(|p| p.as_str())
+            .ok_or_else(|| "Путь к файлу не указан".to_string())
+    }
 
-        config
+    /// Получить алгоритм
+    fn get_alg(&self) -> Result<&str, String> {
+        self.alg
+            .as_ref()
+            .map(|a| a.as_str())
+            .ok_or_else(|| "Алгоритм не указан".to_string())
     }
 
     /// Проверить и заполнить недостающие параметры
     fn validate_and_complete(&mut self) -> Result<(), String> {
-        // Если указан алгоритм хеширования, то ключ и действие не нужны
-        if self.hash_function.is_some() {
+        // Если указана хеш-функция, то ключ и действие не нужны
+        if self.hash.is_some() {
             return Ok(());
         }
 
         // Если HKDF, то не требуется действие и проверка файла
-        if matches!(self.algorithm.as_ref().map(|a| a.as_str()), Some("hkdf")) {
+        if matches!(self.alg.as_ref().map(|a| a.as_str()), Some("hkdf")) {
             if self.key.is_none() {
                 eprintln!("(!) Ключ (IKM) не указан, сгенерируем сами!");
-                self.key = Some(generate_random_key(32));
+                self.key = Some(hex::encode(generate_random_key(32)));
                 eprintln!("(✓) Сгенерирован случайный ключ длиной 32 байта");
             }
             return Ok(());
         }
 
         // Проверяем файл
-        if let Some(ref path) = self.file_path {
+        if let Some(ref path) = self.path {
             if !Path::new(path).exists() {
                 return Err(format!("Ошибка: файл '{}' не найден", path));
             }
         } else {
-            return Err("Ошибка: не указан путь к файлу".to_string());
+            return Err("Ошибка: не указан путь к файлу (используй --path или -p)".to_string());
         }
 
         // Проверяем алгоритм
-        if self.algorithm.is_none() {
-            return Err("Ошибка: не указан алгоритм".to_string());
+        if self.alg.is_none() {
+            return Err("Ошибка: не указан алгоритм (используй --alg или -a)".to_string());
         }
 
         // Проверяем действие (если это не тестирование)
-        if !matches!(self.algorithm.as_ref().map(|a| a.as_str()), Some("aes-test")) {
-            if self.action.is_none() {
-                return Err("Ошибка: не указано действие (encrypt/decrypt)".to_string());
+        if !matches!(self.alg.as_ref().map(|a| a.as_str()), Some("aes-test")) {
+            if self.func.is_none() {
+                return Err(
+                    "Ошибка: не указано действие (используй --func encrypt/decrypt или -f)"
+                        .to_string(),
+                );
             }
         }
 
         // Генерируем ключ, если не указан
         if self.key.is_none() {
             eprintln!("(!) Ключ не указан, сгенерируем сами!");
-            self.key = Some(generate_random_key(32));
+            self.key = Some(hex::encode(generate_random_key(32)));
             eprintln!("(✓) Сгенерирован случайный ключ длиной 32 байта");
         }
 
@@ -166,7 +177,6 @@ fn get_or_generate_seed() -> u32 {
         })
 }
 
-/// Список функций вызовов для хеширования строк
 /// Функция для хеширования строки через MurmurHash3
 fn murmurhash3_hashing(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let seed = get_or_generate_seed();
@@ -187,16 +197,11 @@ fn djb2_hashing(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Список функций вызовов для шифрования
 /// Функция для шифрования файла RC4
 fn rc4_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    // Читаем файл
     let mut data = fs::read(file_path)?;
-    // Инициализируем RC4
     let mut state = alg::rc4_init(key);
-    // Шифруем
     alg::rc4_crypt(&mut state, &mut data);
-    // Сохраняем в новый файл
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &data)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -206,25 +211,23 @@ fn rc4_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::erro
 /// Функция для шифрования файла XTEA
 fn xtea_encrypt_file(file_path: &str, _key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let data = fs::read(file_path)?;
-    
-    // Преобразуем данные в массив u32[2] (XTEA работает с 8 байтами)
+
     if data.len() < 8 {
         return Err("Данные должны быть минимум 8 байт для XTEA".into());
     }
-    
+
     let mut block = [0u32; 2];
     block[0] = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
     block[1] = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-    
-    // XTEA ключ - 4 u32
+
     let key = [0u32; 4];
-    
+
     alg::xtea_encrypt(&mut block, &key);
-    
+
     let mut encrypted = Vec::new();
     encrypted.extend_from_slice(&block[0].to_le_bytes());
     encrypted.extend_from_slice(&block[1].to_le_bytes());
-    
+
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &encrypted)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -236,7 +239,7 @@ fn xorshift_encrypt_file(file_path: &str, _key: &[u8]) -> Result<(), Box<dyn std
     let input_path = file_path;
     let output_path = format!("{}.enc", file_path);
     let seed = generate_random_seed();
-    
+
     alg::process_file(input_path, &output_path, seed)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
     Ok(())
@@ -245,14 +248,13 @@ fn xorshift_encrypt_file(file_path: &str, _key: &[u8]) -> Result<(), Box<dyn std
 /// Функция для шифрования файла Madryga
 fn madryga_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let mut data = fs::read(file_path)?;
-    
-    // Преобразуем ключ в u64
+
     let key_u64 = if key.len() >= 8 {
         u64::from_le_bytes([key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]])
     } else {
         0u64
     };
-    
+
     alg::madryga_encrypt(&mut data, key_u64);
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &data)?;
@@ -265,7 +267,7 @@ fn vigenere_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std:
     let buffer = fs::read_to_string(file_path)?;
     let key_str = String::from_utf8_lossy(key);
     let output_path = format!("{}.enc", file_path);
-    
+
     let processed_data = alg::viginere_encrypt(&buffer, &key_str, false);
     fs::write(&output_path, &processed_data)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -277,7 +279,7 @@ fn salsa20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::
     let mut data = fs::read(file_path)?;
     let nonce = [0u8; 8];
     let key_array: &[u8; 32] = key.try_into().expect("Неверная длина ключа");
-    let encrypted = alg::salsa20_encrypt(&mut data, key_array, &nonce);
+    let _encrypted = alg::salsa20_encrypt(&mut data, key_array, &nonce);
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &data)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -293,7 +295,7 @@ fn camellia_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std:
     if key.len() < 32 {
         return Err("Ключ должен быть минимум 32 байт для Camellia-256".into());
     }
-    
+
     let key_array: [u8; 32] = key[0..32].try_into()
         .map_err(|_| "Неверная длина ключа для Camellia")?;
     let camellia_key = alg::key_schedule(&key_array);
@@ -311,7 +313,7 @@ fn camellia_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std:
         let encrypted = alg::camelia_encrypt(&last_block, &camellia_key);
         output.extend_from_slice(&encrypted);
     }
-    
+
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &output)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -320,22 +322,22 @@ fn camellia_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std:
 
 /// Функция для шифрования файла ChaCha20
 fn chacha20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    let data = fs::read(file_path)?;    
+    let data = fs::read(file_path)?;
     if key.len() < 32 {
         return Err("Ключ должен быть минимум 32 байт для ChaCha20".into());
-    }    
+    }
     let key_array: [u8; 32] = key[0..32].try_into()
         .map_err(|_| "Неверная длина ключа для ChaCha20")?;
-    
+
     let mut nonce = [0u8; 12];
-    getrandom::getrandom(&mut nonce);
-    
+    getrandom::getrandom(&mut nonce).map_err(|e| e.to_string())?;
+
     let encrypted = alg::chacha20_encrypt(&key_array, 0, &nonce, &data);
     let output_path = format!("{}.enc", file_path);
     let mut output = Vec::with_capacity(12 + encrypted.len());
     output.extend_from_slice(&nonce);
     output.extend_from_slice(&encrypted);
-    
+
     fs::write(&output_path, &output)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
     Ok(())
@@ -344,13 +346,12 @@ fn chacha20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std:
 /// Функция для шифрования файла RC5
 fn rc5_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let data = fs::read(file_path)?;
-    
-    // RC5 требует 3 аргумента: &[u8], u8 (rounds), и выходной буфер
-    let rounds = 12u8;  // стандартное количество раундов
+
+    let rounds = 12u8;
     let mut output = vec![0u8; data.len()];
-    
+
     alg::rc5_encrypt(&data, rounds, &data, &mut output);
-    
+
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &output)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -360,18 +361,17 @@ fn rc5_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::erro
 /// Функция для шифрования файла AES
 fn aes_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let plaintext = fs::read(file_path)?;
-    
-    // AES требует ровно 16 байт для блока и ключа
+
     if plaintext.len() < 16 {
         return Err("Данные должны быть минимум 16 байт для AES".into());
     }
     if key.len() < 16 {
         return Err("Ключ должен быть минимум 16 байт для AES".into());
     }
-    
+
     let plaintext_block = <[u8; 16]>::try_from(&plaintext[0..16])?;
     let key_block = <[u8; 16]>::try_from(&key[0..16])?;
-    
+
     let ciphertext = alg::cipher(&plaintext_block, &key_block);
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &ciphertext)?;
@@ -379,7 +379,7 @@ fn aes_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-/// ТУТ НАЧИНАЮТСЯ ТЕСТЫ(Tests) ДЛЯ ВСЕХ АЛГОРИТМОВ ЧЕРЕЗ RSP ФАЙЛЫ
+/// Тесты для AES через RSP файлы
 fn aes_test_rsp(file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let testing_str = fs::read_to_string(file_path)?;
     println!("Убедитесь, что тесты загружены в папку рядом с main.rs, у нас пока что проблемы, скачайте сами, извините.");
@@ -390,35 +390,39 @@ fn aes_test_rsp(file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Функция для HKDF операций
 fn hkdf_derive(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let ikm = config
-        .key
+    let ikm = config.key.as_ref().ok_or("IKM (ключевой материал) не указан")?;
+    let ikm_bytes = CryptoConfig::string_to_bytes(ikm);
+
+    let salt_bytes = config
+        .salt
         .as_ref()
-        .ok_or("IKM (ключевой материал) не указан")?;
-    
-    let salt = config.salt.as_ref().map(|s| s.as_slice()).unwrap_or(&[]);
-    let info = config.info.as_ref().map(|i| i.as_slice()).unwrap_or(&[]);
-    
-    // Длина вывода - 32 байта по умолчанию (для SHA-256)
-    let output_length = 32;  
-    // Extract этап
-    let prk = passwd_hashing::hkdf_extract(salt, ikm);  
-    // Expand этап
-    let okm = passwd_hashing::hkdf_expand(&prk, info, output_length);
+        .map(|s| CryptoConfig::string_to_bytes(s))
+        .unwrap_or_default();
+
+    let info_bytes = config
+        .info
+        .as_ref()
+        .map(|i| CryptoConfig::string_to_bytes(i))
+        .unwrap_or_default();
+
+    let output_length = 32;
+    let prk = passwd_hashing::hkdf_extract(&salt_bytes, &ikm_bytes);
+    let okm = passwd_hashing::hkdf_expand(&prk, &info_bytes, output_length);
     let output_path = "hkdf_output.bin";
     fs::write(output_path, &okm)?;
     println!("✓ Результат сохранён в: {}", output_path);
-    
+
     Ok(())
 }
 
 /// Обработать хеширование на основе конфигурации
 fn handle_hashing(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
     let hash_fn = config
-        .hash_function
+        .hash
         .as_ref()
         .ok_or("Хеш-функция не указана")?;
 
-    let data = if let Some(ref file_path) = config.file_path {
+    let data = if let Some(ref file_path) = config.path {
         if Path::new(file_path).exists() {
             fs::read(file_path)?
         } else {
@@ -449,66 +453,63 @@ fn handle_hashing(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error
 
 /// Обработать шифрование на основе конфигурации
 fn handle_encryption(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let algorithm = config
-        .algorithm
-        .as_ref()
-        .ok_or("Алгоритм не указан")?;
+    let algorithm = config.get_alg()?;
 
-    match algorithm.as_str() {
+    match algorithm {
         "hkdf" => {
             hkdf_derive(config)?;
         }
         "rc4" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            rc4_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            rc4_encrypt_file(file_path, &key)?;
         }
         "xtea" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            xtea_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            xtea_encrypt_file(file_path, &key)?;
         }
         "xorshift" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
+            let file_path = config.get_path()?;
             xorshift_encrypt_file(file_path, &[])?;
         }
         "madryga" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            madryga_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            madryga_encrypt_file(file_path, &key)?;
         }
         "vigenere" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            vigenere_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            vigenere_encrypt_file(file_path, &key)?;
         }
         "salsa20" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            salsa20_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            salsa20_encrypt_file(file_path, &key)?;
         }
         "rc5" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            rc5_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            rc5_encrypt_file(file_path, &key)?;
         }
         "camelia" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            camellia_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            camellia_encrypt_file(file_path, &key)?;
         }
         "chacha20" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            chacha20_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            chacha20_encrypt_file(file_path, &key)?;
         }
         "aes" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-            let key = config.key.as_ref().ok_or("Ключ не указан")?;
-            aes_encrypt_file(file_path, key)?;
+            let file_path = config.get_path()?;
+            let key = config.get_key()?;
+            aes_encrypt_file(file_path, &key)?;
         }
         "aes-test" => {
-            let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
+            let file_path = config.get_path()?;
             aes_test_rsp(file_path)?;
         }
         _ => {
@@ -520,29 +521,37 @@ fn handle_encryption(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-/// РЕЖИМЫ шифрования
+/// Обработать дешифрование на основе конфигурации
+fn handle_decryption(_config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
+    eprintln!("(!) Дешифрование пока не реализовано");
+    Err("Дешифрование пока не реализовано".into())
+}
+
+/// Режимы шифрования
 fn encrypt_with_mode(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-    let algorithm = config.algorithm.as_ref().ok_or("Алгоритм не указан")?;
+    let file_path = config.get_path()?;
+    let algorithm = config.get_alg()?;
     let mode = config.mode.as_ref().ok_or("Режим не указан")?;
-    let key = config.key.as_ref().ok_or("Ключ не указан")?;
-    
+    let key = config.get_key()?;
+
     let plaintext = fs::read(file_path)?;
-    let cipher = CipherFactory::create_cipher(algorithm, key)?;
-    
+    let cipher = CipherFactory::create_cipher(algorithm, &key)?;
+
     let ciphertext = match mode.to_lowercase().as_str() {
         "ecb" => EcbMode::encrypt(cipher.as_ref(), &plaintext)?,
         "cbc" => {
             let iv = config.iv.as_ref().ok_or("IV требуется для CBC")?;
-            CbcMode::new(iv.clone())?.encrypt(cipher.as_ref(), &plaintext)?
+            let iv_bytes = CryptoConfig::string_to_bytes(iv);
+            CbcMode::new(iv_bytes)?.encrypt(cipher.as_ref(), &plaintext)?
         }
         "ctr" => {
             let nonce = config.nonce.as_ref().ok_or("Nonce требуется для CTR")?;
-            CtrMode::new(nonce.clone())?.encrypt(cipher.as_ref(), &plaintext)?
+            let nonce_bytes = CryptoConfig::string_to_bytes(nonce);
+            CtrMode::new(nonce_bytes)?.encrypt(cipher.as_ref(), &plaintext)?
         }
         _ => return Err(format!("Неизвестный режим: {}", mode).into()),
     };
-    
+
     let output_path = format!("{}.{}.enc", file_path, mode.to_lowercase());
     fs::write(&output_path, &ciphertext)?;
     println!("✓ Файл зашифрован в: {}", output_path);
@@ -550,52 +559,62 @@ fn encrypt_with_mode(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Er
 }
 
 fn decrypt_with_mode(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-    let algorithm = config.algorithm.as_ref().ok_or("Алгоритм не указан")?;
+    let file_path = config.get_path()?;
+    let algorithm = config.get_alg()?;
     let mode = config.mode.as_ref().ok_or("Режим не указан")?;
-    let key = config.key.as_ref().ok_or("Ключ не указан")?;
-    
+    let key = config.get_key()?;
+
     let ciphertext = fs::read(file_path)?;
-    let cipher = CipherFactory::create_cipher(algorithm, key)?;
-    
+    let cipher = CipherFactory::create_cipher(algorithm, &key)?;
+
     let plaintext = match mode.to_lowercase().as_str() {
         "ecb" => EcbMode::decrypt(cipher.as_ref(), &ciphertext)?,
         "cbc" => {
             let iv = config.iv.as_ref().ok_or("IV требуется для CBC")?;
-            CbcMode::new(iv.clone())?.decrypt(cipher.as_ref(), &ciphertext)?
+            let iv_bytes = CryptoConfig::string_to_bytes(iv);
+            CbcMode::new(iv_bytes)?.decrypt(cipher.as_ref(), &ciphertext)?
         }
         "ctr" => {
             let nonce = config.nonce.as_ref().ok_or("Nonce требуется для CTR")?;
-            CtrMode::new(nonce.clone())?.decrypt(cipher.as_ref(), &ciphertext)?
+            let nonce_bytes = CryptoConfig::string_to_bytes(nonce);
+            CtrMode::new(nonce_bytes)?.decrypt(cipher.as_ref(), &ciphertext)?
         }
         _ => return Err(format!("Неизвестный режим: {}", mode).into()),
     };
-    
-    let output_path = format!("{}.dec", file_path);
+
+    let output_path = format!("{}.{}.dec", file_path, mode.to_lowercase());
     fs::write(&output_path, &plaintext)?;
     println!("✓ Файл расшифрован в: {}", output_path);
     Ok(())
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut config = CryptoConfig::from_args(&args);
-    
+    let mut config = CryptoConfig::parse();
+
     if let Err(e) = config.validate_and_complete() {
         eprintln!("(!) {}", e);
-        return;
+        std::process::exit(1);
     }
+    let result: Result<(), Box<dyn std::error::Error>> = match () {
+        _ if config.hash.is_some() => handle_hashing(&config),
+        _ if config.mode.is_some() => {
+            match config.func.as_deref() {
+                Some("encrypt") => encrypt_with_mode(&config),
+                Some("decrypt") => decrypt_with_mode(&config),
+                _ => Err("Укажите --func encrypt или decrypt для режима блочного шифра".into()),
+            }
+        }
+        _ => {
+            match config.func.as_deref() {
+                Some("encrypt") => handle_encryption(&config),
+                Some("decrypt") => handle_decryption(&config),
+                _ => handle_encryption(&config), // Запасной вариант (например, для hkdf)
+            }
+        }
+    };
 
-    // Определяем тип операции и выполняем
-    if config.hash_function.is_some() {
-        // Операция хеширования
-        if let Err(e) = handle_hashing(&config) {
-            eprintln!("(!) Ошибка хеширования: {}", e);
-        }
-    } else {
-        // Операция шифрования/дериватиции
-        if let Err(e) = handle_encryption(&config) {
-            eprintln!("(!) Ошибка операции: {}", e);
-        }
+    if let Err(e) = result {
+        eprintln!("❌ Ошибка выполнения: {}", e);
+        std::process::exit(1);
     }
 }
