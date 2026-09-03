@@ -187,9 +187,3 @@ pub fn camelia_encrypt(block: &[u8; 16], key: &CamelliaKey) -> [u8; 16] {
     
     result
 }
-
-/// Расшифровка
-pub fn camelia_decrypt(block: &[u8; 16], key: &CamelliaKey) -> [u8; 16] {
-   let state = *block;
-   state
-}

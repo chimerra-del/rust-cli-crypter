@@ -18,7 +18,3 @@ pub fn xtea_encrypt(v: &mut [u32; 2], k: &[u32; 4]) {
     v[0] = v0;
     v[1] = v1;
 }
-
-pub fn xtea_decrypt(block: &mut [u32; 2], key: &[u32; 4]) {
-  
-}

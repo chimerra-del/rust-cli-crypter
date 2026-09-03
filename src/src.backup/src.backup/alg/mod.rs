@@ -22,8 +22,5 @@ pub use aes::cipher;
 pub use camelia::camelia_encrypt;
 pub use camelia::key_schedule;
 pub use chacha20::chacha20_encrypt;
-pub use aes::inv_cipher;
-pub use camelia::camelia_decrypt;
-pub use xtea::xtea_decrypt;
 
 pub use block_cipher::BlockCipher;

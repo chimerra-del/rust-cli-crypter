@@ -202,9 +202,3 @@ fn sub_word(word: [u8; 4]) -> [u8; 4] {
 fn rot_word(word: [u8; 4]) -> [u8; 4] {
     [word[1], word[2], word[3], word[0]]
 }
-
-/// Расшифровка
-pub fn inv_cipher(ciphertext: &[u8; 16], key: &[u8; 16]) -> [u8; 16] {
-   let mut state = *ciphertext;
-   state
-}

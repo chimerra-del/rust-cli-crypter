@@ -2,12 +2,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::io::{self, Write};
-use cipher_factory::CipherFactory;
-use cipher_modes::{EcbMode, CbcMode, CtrMode, GcmMode};
 
-mod cipher_implementations;
-mod cipher_modes;
-mod cipher_factory;
 mod alg;
 mod rsp_parser;
 mod passwd_hashing;
@@ -23,9 +18,6 @@ struct CryptoConfig {
     hash_function: Option<String>,
     salt: Option<Vec<u8>>,
     info: Option<Vec<u8>>,
-    mode: Option<String>,
-    iv: Option<Vec<u8>>,
-    nonce: Option<Vec<u8>>,
 }
 
 impl CryptoConfig {
@@ -38,9 +30,6 @@ impl CryptoConfig {
             hash_function: None,
             salt: None,
             info: None,
-            mode: None,
-            iv: None,
-            nonce: None,
         }
     }
 
@@ -68,15 +57,6 @@ impl CryptoConfig {
         }
         if args.len() > 7 {
             config.info = Some(args[7].as_bytes().to_vec());
-        }
-        if args.len() > 8 {
-        config.mode = Some(args[8].clone());
-        }
-        if args.len() > 9 {
-        config.iv = Some(args[9].as_bytes().to_vec());
-        }
-        if args.len() > 10 {
-        config.nonce = Some(args[10].as_bytes().to_vec());
         }
 
         config
@@ -517,63 +497,6 @@ fn handle_encryption(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Er
         }
     }
 
-    Ok(())
-}
-
-/// РЕЖИМЫ шифрования
-fn encrypt_with_mode(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-    let algorithm = config.algorithm.as_ref().ok_or("Алгоритм не указан")?;
-    let mode = config.mode.as_ref().ok_or("Режим не указан")?;
-    let key = config.key.as_ref().ok_or("Ключ не указан")?;
-    
-    let plaintext = fs::read(file_path)?;
-    let cipher = CipherFactory::create_cipher(algorithm, key)?;
-    
-    let ciphertext = match mode.to_lowercase().as_str() {
-        "ecb" => EcbMode::encrypt(cipher.as_ref(), &plaintext)?,
-        "cbc" => {
-            let iv = config.iv.as_ref().ok_or("IV требуется для CBC")?;
-            CbcMode::new(iv.clone())?.encrypt(cipher.as_ref(), &plaintext)?
-        }
-        "ctr" => {
-            let nonce = config.nonce.as_ref().ok_or("Nonce требуется для CTR")?;
-            CtrMode::new(nonce.clone())?.encrypt(cipher.as_ref(), &plaintext)?
-        }
-        _ => return Err(format!("Неизвестный режим: {}", mode).into()),
-    };
-    
-    let output_path = format!("{}.{}.enc", file_path, mode.to_lowercase());
-    fs::write(&output_path, &ciphertext)?;
-    println!("✓ Файл зашифрован в: {}", output_path);
-    Ok(())
-}
-
-fn decrypt_with_mode(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let file_path = config.file_path.as_ref().ok_or("Путь к файлу не указан")?;
-    let algorithm = config.algorithm.as_ref().ok_or("Алгоритм не указан")?;
-    let mode = config.mode.as_ref().ok_or("Режим не указан")?;
-    let key = config.key.as_ref().ok_or("Ключ не указан")?;
-    
-    let ciphertext = fs::read(file_path)?;
-    let cipher = CipherFactory::create_cipher(algorithm, key)?;
-    
-    let plaintext = match mode.to_lowercase().as_str() {
-        "ecb" => EcbMode::decrypt(cipher.as_ref(), &ciphertext)?,
-        "cbc" => {
-            let iv = config.iv.as_ref().ok_or("IV требуется для CBC")?;
-            CbcMode::new(iv.clone())?.decrypt(cipher.as_ref(), &ciphertext)?
-        }
-        "ctr" => {
-            let nonce = config.nonce.as_ref().ok_or("Nonce требуется для CTR")?;
-            CtrMode::new(nonce.clone())?.decrypt(cipher.as_ref(), &ciphertext)?
-        }
-        _ => return Err(format!("Неизвестный режим: {}", mode).into()),
-    };
-    
-    let output_path = format!("{}.dec", file_path);
-    fs::write(&output_path, &plaintext)?;
-    println!("✓ Файл расшифрован в: {}", output_path);
     Ok(())
 }
 
