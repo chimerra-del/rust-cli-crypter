@@ -26,15 +26,24 @@ rust-cli-crypter/
 ├── Cargo.toml
 ├── Cargo.lock
 └── src/
-    ├── alg/                  # Cipher primitives (AES, ChaCha20, Camellia, Lucifer, etc.)
-    ├── modes/                # Block modes of operation (ECB, CBC, CTR, GCM, etc.)
-    ├── hashing/              # Hashing algorithms (FNV1a, MurmurHash3, DJB2, SHA128)
-    ├── passwd_hashing/       # Key derivation & pseudorandom functions (HKDF)
-    ├── obfuse/               # Binary transformation and obfuscation routines
-    ├── cipher_factory.rs     # Factory pattern for dynamic Cipher + Mode assembly
-    ├── cipher_modes.rs       # Mode abstractions & traits
-    ├── rsp_parser.rs         # Response/Request vector parsing utilities
-    └── main.rs               # CLI argument parsing and execution orchestration
+    ├── alg/                
+    # Cipher primitives (AES, ChaCha20, Camellia, Lucifer, etc.)
+    ├── modes/              
+    # Block modes of operation (ECB, CBC, CTR, GCM, etc.)
+    ├── hashing/             
+    # Hashing algorithms (FNV1a, MurmurHash3, DJB2, SHA128)
+    ├── passwd_hashing/     
+    # Key derivation & pseudorandom functions (HKDF)
+    ├── obfuse/       
+    # Binary transformation and obfuscation routines
+    ├── cipher_factory.rs  
+    # Factory pattern for dynamic Cipher + Mode assembly
+    ├── cipher_modes.rs   
+    # Mode abstractions & traits
+    ├── rsp_parser.rs   
+    # Response/Request vector parsing utilities
+    └── main.rs      
+    # CLI argument parsing and execution orchestration
 
 ## 🏫 Building 
 # Clone the repository
