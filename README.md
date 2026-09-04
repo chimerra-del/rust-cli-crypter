@@ -1,4 +1,4 @@
-##⚠️ **IMPORTANT DISCLAIMER**
+## ⚠️ **IMPORTANT DISCLAIMER**
 All ciphers, hash functions, and block modes in this repository have been **implemented manually from scratch** based on official NIST and RFC specifications without relying on high-level external cryptographic libraries. This software is **NOT intended for production use or real-world data protection**. Due to its experimental nature, edge-case bugs, runtime crashes, or susceptibility to side-channel attacks may exist. Use strictly for academic study, security auditing, and educational demonstrations!
 
 ## 🚀 Key Features
