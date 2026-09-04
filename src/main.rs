@@ -263,15 +263,34 @@ fn madryga_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::
 }
 
 /// Функция для шифрования файла Vigenere
-fn vigenere_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    let buffer = fs::read_to_string(file_path)?;
-    let key_str = String::from_utf8_lossy(key);
+fn viginere_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let buffer = fs::read(file_path)?;  // Читаем как бинарные данные
     let output_path = format!("{}.enc", file_path);
 
-    let processed_data = alg::viginere_encrypt(&buffer, &key_str, false);
+    let processed_data = viginere_encrypt_bytes(&buffer, key, false);
     fs::write(&output_path, &processed_data)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
     Ok(())
+}
+
+// Вспомогательная функция
+pub fn viginere_encrypt_bytes(data: &[u8], key: &[u8], decrypt: bool) -> Vec<u8> {
+    if key.is_empty() {
+        return data.to_vec();
+    }
+
+    data.iter()
+        .enumerate()
+        .map(|(i, &byte)| {
+            let key_byte = key[i % key.len()];
+            
+            if decrypt {
+                byte.wrapping_sub(key_byte)
+            } else {
+                byte.wrapping_add(key_byte)
+            }
+        })
+        .collect()
 }
 
 /// Функция для шифрования файла Salsa20
@@ -345,13 +364,30 @@ fn chacha20_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std:
 
 /// Функция для шифрования файла RC5
 fn rc5_encrypt_file(file_path: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    use std::fs;    
     let data = fs::read(file_path)?;
-
     let rounds = 12u8;
-    let mut output = vec![0u8; data.len()];
-
-    alg::rc5_encrypt(&data, rounds, &data, &mut output);
-
+    
+    // Паддинг
+    let pad_len = 8 - (data.len() % 8);
+    let mut padded_data = data.clone();
+    padded_data.extend(vec![pad_len as u8; if pad_len == 8 { 0 } else { pad_len }]); 
+    // Выходной буфер такого же размера как входной с паддингом
+    let mut output = vec![0u8; padded_data.len()];  
+    // Шифруем каждый блок по 8 байт
+    for (chunk_idx, chunk) in padded_data.chunks(8).enumerate() {
+        let start = chunk_idx * 8;
+        let end = start + 8;   
+        // Подготавливаем блок для шифрования (всегда 8 байт)
+        let mut block = [0u8; 8];
+        block.copy_from_slice(chunk); // chunk всегда 8 байт из-за паддинга     
+        // Шифруем блок
+        let mut encrypted_block = [0u8; 8];
+        alg::rc5_encrypt(key, rounds, &block, &mut encrypted_block);    
+        // Записываем в выходной буфер
+        output[start..end].copy_from_slice(&encrypted_block);
+    }
+    
     let output_path = format!("{}.enc", file_path);
     fs::write(&output_path, &output)?;
     println!("✓ Файл зашифрован и сохранён в: {}", output_path);
@@ -481,7 +517,7 @@ fn handle_encryption(config: &CryptoConfig) -> Result<(), Box<dyn std::error::Er
         "vigenere" => {
             let file_path = config.get_path()?;
             let key = config.get_key()?;
-            vigenere_encrypt_file(file_path, &key)?;
+            viginere_encrypt_file(file_path, &key)?;
         }
         "salsa20" => {
             let file_path = config.get_path()?;

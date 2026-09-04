@@ -1,7 +1,7 @@
 // Custom RC5 Rust
 // Стань единой с моею тенью
 pub fn rc5_encrypt(s: &[u8], r: u8, plaintext: &[u8], out: &mut [u8]) { 
-    let mut a = (plaintext[0] & 0xFF) as u32;  // Удалил дублирование
+    let mut a = (plaintext[0] & 0xFF) as u32;
     a |= ((plaintext[1] & 0xFF) as u32) << 8;
     a |= ((plaintext[2] & 0xFF) as u32) << 16;
     a |= ((plaintext[3] & 0xFF) as u32) << 24;
